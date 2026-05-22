@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checksum Calculator - Fueco Tools</title>
+    <link rel="stylesheet" href="../../shared/style.css">
+    <style>
+        .tool-container { max-width: 600px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #4A4036; font-weight: bold; }
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #C4B5A5; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #C4B5A5; color: #fff; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #A39688; }
+        .result-box { margin-top: 20px; padding: 15px; background: #FDFBF7; border: 1px solid #E8E4D9; border-radius: 4px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="tool-container">
+        <h1>Checksum Calculator</h1>
+        <div class="input-group">
+            <label for="inputData">Data (ASCII or Hex):</label>
+            <textarea id="inputData" placeholder="Enter string or hex (e.g. 010203)"></textarea>
+        </div>
+        <button onclick="calculateChecksum()">Calculate</button>
+        <div class="result-box">
+            <p><strong>8-bit Additive:</strong> <span id="res8"></span></p>
+            <p><strong>16-bit Additive:</strong> <span id="res16"></span></p>
+        </div>
+    </div>
+    <script>
+        function calculateChecksum() {
+            const input = document.getElementById('inputData').value.trim();
+            let bytes = [];
+            
+            if (/^[0-9a-fA-F\s]+$/.test(input)) {
+                // Hex
+                const hex = input.replace(/\s/g, '');
+                for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16));
+            } else {
+                // ASCII
+                for (let i = 0; i < input.length; i++) bytes.push(input.charCodeAt(i));
+            }
+
+            let sum8 = 0, sum16 = 0;
+            for(let b of bytes) {
+                sum8 = (sum8 + b) % 256;
+                sum16 = (sum16 + b) % 65536;
+            }
+
+            document.getElementById('res8').textContent = '0x' + sum8.toString(16).toUpperCase().padStart(2, '0');
+            document.getElementById('res16').textContent = '0x' + sum16.toString(16).toUpperCase().padStart(4, '0');
+        }
+    </script>
+</body>
+</html>

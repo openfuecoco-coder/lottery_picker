@@ -1,0 +1,9 @@
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #FDFBF7; color: #4A4036; display: flex; justify-content: center; padding: 20px; }
+    .container { background-color: #E8E4D9; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); width: 100%; max-width: 600px; }
+    h1 { text-align: center; color: #4A4036; margin-bottom: 1.5rem; }
+    select, textarea, input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #C4B5A5; border-radius: 8px; box-sizing: border-box; font-size: 1rem; background: #FDFBF7; color: #4A4036; }
+    button { background-color: #C4B5A5; color: #FDFBF7; border: none; cursor: pointer; font-weight: 600; transition: background 0.3s; }
+    button:hover { background-color: #A39688; }
+    #result, .output { margin-top: 1.5rem; padding: 1rem; background: #FDFBF7; border-radius: 8px; color: #4A4036; font-family: monospace; text-align: center; word-break: break-all; border: 1px solid #C4B5A5; }
+</style>

@@ -1,0 +1,22 @@
+# Fueco Tools Agent Rules
+
+- This is a static tools website.
+- Use pure HTML, CSS, and JavaScript only.
+- Do not use backend.
+- Do not add external libraries.
+- Do not add real AdSense code.
+- Do not modify existing tools under tools/* unless explicitly requested.
+- When adding a new tool, create only tools/new-tool/index.html.
+- Only update index.html and sitemap.xml when registering a new tool.
+- Do not modify shared/style.css or shared/ads.js unless explicitly requested.
+- Every tool page must include:
+ - Tool body
+ - How to use
+ - Example input
+ - Common mistakes
+ - Related tools
+ - SEO title and description
+ - WebApplication JSON-LD schema
+- After creating index.html, run: `/home/open-fuecoco/scripts/deploy_github_pages.sh openfuecoco-tools`
+
+
