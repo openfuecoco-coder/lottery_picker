@@ -324,15 +324,18 @@
             const sliceAngle = (2 * Math.PI / wheelItems.length);
 
             // Calculate the absolute angle for the center of the target slice to be at the top pointer (0 radians)
-            const angleToCenterOfTargetSlice = targetSliceIndex * sliceAngle + sliceAngle / 2;
-            const desiredFinalWheelRotation = (2 * Math.PI - angleToCenterOfTargetSlice) % (2 * Math.PI); // This is the absolute wheel rotation we want at the end
+            // So, if currentRotation is the wheel's rotation, the angle of slice i's center on canvas is
+            // currentRotation + (i + 0.5) * sliceAngle. We want this to be 0 (mod 2*PI).
+            // Thus, currentRotation = -((i + 0.5) * sliceAngle) (mod 2*PI).
+            const desiredFinalWheelRotation = (2 * Math.PI - ((targetSliceIndex + 0.5) * sliceAngle) % (2 * Math.PI)) % (2 * Math.PI);
 
             const startRotationForAnimation = currentRotation; // Use the current wheel rotation as start
             // Calculate the total rotation needed from current to desired, adding full spins
             let diff = desiredFinalWheelRotation - startRotationForAnimation;
-            if (diff < 0) {
-                diff += 2 * Math.PI; // Ensure positive shortest path
-            }
+            // Ensure positive shortest path for difference
+            if (diff < -Math.PI) diff += 2 * Math.PI;
+            if (diff > Math.PI) diff -= 2 * Math.PI;
+
             const endRotationForAnimation = startRotationForAnimation + (numRotations * 2 * Math.PI) + diff;
 
             const duration = 4000; // 4 seconds spin
@@ -358,7 +361,15 @@
                     // Ensure final rotation is exactly the desired finalWheelRotation
                     currentRotation = desiredFinalWheelRotation;
                     drawWheel();
-                    displayResult(targetSliceIndex);
+
+                    // Recalculate the winning index based on the final currentRotation.
+                    // The pointer is at 0 radians on the canvas (top). After currentRotation, what angle from the unrotated wheel is at 0?
+                    // It's `(2 * Math.PI - currentRotation % (2 * Math.PI)) % (2 * Math.PI)`. Let's call this `thetaAtPointer`.
+                    // The slice whose start angle `i * sliceAngle` is less than or equal to `thetaAtPointer` is the winning one.
+                    const thetaAtPointer = (2 * Math.PI - (currentRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+                    const calculatedIndex = Math.floor(thetaAtPointer / sliceAngle);
+
+                    displayResult(calculatedIndex);
                 }
             }
             animationId = requestAnimationFrame(animate);
