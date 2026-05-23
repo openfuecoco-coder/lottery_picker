@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抽籤器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #FDFBF7; /* 燕麥白 */
+            color: #4A4036; /* 深炭棕 */
+        }
+        .container {
+            background-color: #E8E4D9; /* 奶茶米色 */
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #4A4036;
+            margin-bottom: 20px;
+        }
+        label, select, input, button {
+            display: block;
+            width: calc(100% - 20px);
+            margin: 10px auto;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #C4B5A5;
+            font-size: 16px;
+        }
+        button {
+            background-color: #C4B5A5; /* 莫蘭迪駝色 */
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #A59685;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #4A4036;
+        }
+        textarea {
+            width: calc(100% - 20px);
+            margin: 10px auto;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #C4B5A5;
+            font-size: 16px;
+            min-height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>抽籤器</h1>
+
+        <label for="mode-select">選擇模式:</label>
+        <select id="mode-select" onchange="toggleInputMode()">
+            <option value="preset-colors">預設顏色</option>
+            <option value="custom">自訂項目</option>
+        </select>
+
+        <div id="preset-colors-section">
+            <label for="color-select">選擇顏色類型:</label>
+            <select id="color-select">
+                <option value="common">常見顏色</option>
+                <option value="pastels">柔和色系</option>
+                <option value="bright">鮮豔色系</option>
+            </select>
+        </div>
+
+        <div id="custom-section" style="display: none;">
+            <label for="custom-items">輸入自訂項目 (每行一個):</label>
+            <textarea id="custom-items" placeholder="項目1&#10;項目2&#10;項目3"></textarea>
+        </div>
+
+        <button onclick="draw()">抽籤！</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const commonColors = ["紅色", "藍色", "綠色", "黃色", "紫色", "橘色", "粉紅色", "棕色", "黑色", "白色", "灰色", "青色", "洋紅色", "金色", "銀色"];
+        const pastels = ["淺藍", "淺綠", "淺粉", "淡紫", "米色", "薄荷綠", "薰衣草紫", "珊瑚紅", "奶油黃"];
+        const brightColors = ["亮紅", "寶藍", "翠綠", "鮮黃", "桃紅", "螢光橘", "紫羅蘭", "電光藍"];
+
+        function toggleInputMode() {
+            const mode = document.getElementById('mode-select').value;
+            document.getElementById('preset-colors-section').style.display = mode === 'preset-colors' ? 'block' : 'none';
+            document.getElementById('custom-section').style.display = mode === 'custom' ? 'block' : 'none';
+        }
+
+        function draw() {
+            const mode = document.getElementById('mode-select').value;
+            let items = [];
+
+            if (mode === 'preset-colors') {
+                const colorType = document.getElementById('color-select').value;
+                if (colorType === 'common') {
+                    items = commonColors;
+                } else if (colorType === 'pastels') {
+                    items = pastels;
+                } else if (colorType === 'bright') {
+                    items = brightColors;
+                }
+            } else { // custom mode
+                const customInput = document.getElementById('custom-items').value;
+                items = customInput.split('\n').map(item => item.trim()).filter(item => item !== '');
+            }
+
+            if (items.length === 0) {
+                document.getElementById('result').textContent = "請輸入或選擇項目！";
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * items.length);
+            document.getElementById('result').textContent = "恭喜抽到：" + items[randomIndex];
+        }
+
+        // Initialize display
+        toggleInputMode();
+    </script>
+</body>
+</html>
