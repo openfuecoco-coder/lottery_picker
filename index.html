@@ -315,16 +315,25 @@
             if (isSpinning || wheelItems.length === 0) return;
             isSpinning = true;
             spinButton.disabled = true;
-            resetButton.disabled = true; // Disable reset during spin
+            resetButton.disabled = true;
 
             clearResult();
 
             const numRotations = 5; // Minimum full rotations
             const targetSliceIndex = Math.floor(Math.random() * wheelItems.length);
-            // Calculate target angle (to land exactly in the middle of the target slice)
-            // Need to adjust for current rotation to ensure correct relative landing
-            const targetAngleCorrection = (2 * Math.PI / wheelItems.length) * targetSliceIndex;
-            const finalAngle = (numRotations * 2 * Math.PI) + (2 * Math.PI - targetAngleCorrection + (Math.PI / wheelItems.length)); // Ensures landing slightly offset from start of slice, closer to middle
+            const sliceAngle = (2 * Math.PI / wheelItems.length);
+
+            // Calculate the absolute angle for the center of the target slice to be at the top pointer (0 radians)
+            const angleToCenterOfTargetSlice = targetSliceIndex * sliceAngle + sliceAngle / 2;
+            const desiredFinalWheelRotation = (2 * Math.PI - angleToCenterOfTargetSlice) % (2 * Math.PI); // This is the absolute wheel rotation we want at the end
+
+            const startRotationForAnimation = currentRotation; // Use the current wheel rotation as start
+            // Calculate the total rotation needed from current to desired, adding full spins
+            let diff = desiredFinalWheelRotation - startRotationForAnimation;
+            if (diff < 0) {
+                diff += 2 * Math.PI; // Ensure positive shortest path
+            }
+            const endRotationForAnimation = startRotationForAnimation + (numRotations * 2 * Math.PI) + diff;
 
             const duration = 4000; // 4 seconds spin
             const startTime = performance.now();
@@ -336,7 +345,7 @@
                 // Easing function (easeOutCubic)
                 progress = 1 - Math.pow(1 - progress, 3); // Slows down at the end
 
-                currentRotation = (finalAngle * progress) % (2 * Math.PI); // Keep rotation within 0 to 2*PI
+                currentRotation = startRotationForAnimation + (endRotationForAnimation - startRotationForAnimation) * progress;
                 drawWheel();
 
                 if (elapsedTime < duration) {
@@ -346,8 +355,8 @@
                     spinButton.disabled = false;
                     resetButton.disabled = false;
 
-                    // Set final rotation to exactly match the winning slice's center
-                    currentRotation = (2 * Math.PI - (targetAngleCorrection + (Math.PI / wheelItems.length))) % (2 * Math.PI); // Adjust to land exactly on the slice's center after a full cycle
+                    // Ensure final rotation is exactly the desired finalWheelRotation
+                    currentRotation = desiredFinalWheelRotation;
                     drawWheel();
                     displayResult(targetSliceIndex);
                 }
