@@ -2,156 +2,64 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抽籤器</title>
+    <title>轉盤抽籤器</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #FDFBF7; /* 燕麥白 */
-            color: #4A4036; /* 深炭棕 */
-        }
-        .container {
-            background-color: #E8E4D9; /* 奶茶米色 */
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 500px;
-            width: 90%;
-        }
-        h1 {
-            color: #4A4036;
-            margin-bottom: 20px;
-        }
-        label, select, input, button {
-            display: block;
-            width: calc(100% - 20px);
-            margin: 10px auto;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #C4B5A5;
-            font-size: 16px;
-        }
-        button {
-            background-color: #C4B5A5; /* 莫蘭迪駝色 */
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #A59685;
-        }
-        #result {
-            margin-top: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #4A4036;
-        }
-        textarea {
-            width: calc(100% - 20px);
-            margin: 10px auto;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #C4B5A5;
-            font-size: 16px;
-            min-height: 100px;
-            resize: vertical;
-        }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #FDFBF7; color: #4A4036; }
+        .container { background: #E8E4D9; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; }
+        #canvas { margin-top: 20px; cursor: pointer; border-radius: 50%; border: 5px solid #C4B5A5; }
+        button { background: #C4B5A5; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>抽籤器</h1>
-
-        <label for="mode-select">選擇模式:</label>
-        <select id="mode-select" onchange="toggleInputMode()">
-            <option value="preset-colors">預設顏色</option>
-            <option value="custom">自訂項目</option>
+        <h1>轉盤抽籤器</h1>
+        <select id="mode-select" onchange="updateItems()">
+            <option value="common">常見顏色</option>
+            <option value="pastels">柔和色系</option>
+            <option value="bright">鮮豔色系</option>
         </select>
-
-        <div id="preset-colors-section">
-            <label for="color-select">選擇顏色類型:</label>
-            <select id="color-select">
-                <option value="common">常見顏色</option>
-                <option value="pastels">柔和色系</option>
-                <option value="bright">鮮豔色系</option>
-            </select>
-        </div>
-
-        <div id="custom-section" style="display: none;">
-            <label for="custom-items">輸入自訂項目 (每行一個):</label>
-            <textarea id="custom-items" placeholder="項目1&#10;項目2&#10;項目3"></textarea>
-        </div>
-
-        <button onclick="draw()">抽籤！</button>
-
-        <div id="color-box" style="width: 100px; height: 100px; margin: 20px auto; border: 2px solid #4A4036; display: none;"></div>
-        <div id="result"></div>
+        <br>
+        <canvas id="canvas" width="300" height="300"></canvas>
+        <br>
+        <button onclick="spin()">轉動！</button>
+        <h2 id="result"></h2>
     </div>
-
     <script>
-        const commonColors = ["紅色", "藍色", "綠色", "黃色", "紫色", "橘色", "粉紅色", "棕色", "黑色", "白色", "灰色", "青色", "洋紅色", "金色", "銀色"];
-        const pastels = ["淺藍", "淺綠", "淺粉", "淡紫", "米色", "薄荷綠", "薰衣草紫", "珊瑚紅", "奶油黃"];
-        const brightColors = ["亮紅", "寶藍", "翠綠", "鮮黃", "桃紅", "螢光橘", "紫羅蘭", "電光藍"];
-
-        function toggleInputMode() {
-            const mode = document.getElementById('mode-select').value;
-            document.getElementById('preset-colors-section').style.display = mode === 'preset-colors' ? 'block' : 'none';
-            document.getElementById('custom-section').style.display = mode === 'custom' ? 'block' : 'none';
-        }
-
-        const colorMap = {
-            "紅色": "#FF0000", "藍色": "#0000FF", "綠色": "#008000", "黃色": "#FFFF00",
-            "紫色": "#800080", "橘色": "#FFA500", "粉紅色": "#FFC0CB", "棕色": "#A52A2A",
-            "黑色": "#000000", "白色": "#FFFFFF", "灰色": "#808080", "青色": "#00FFFF",
-            "洋紅色": "#FF00FF", "金色": "#FFD700", "銀色": "#C0C0C0",
-            "淺藍": "#ADD8E6", "淺綠": "#90EE90", "淺粉": "#FFB6C1", "淡紫": "#E6E6FA",
-            "米色": "#F5F5DC", "薄荷綠": "#98FF98", "薰衣草紫": "#E6E6FA", "珊瑚紅": "#F08080", "奶油黃": "#FFFDD0",
-            "亮紅": "#FF0000", "寶藍": "#4169E1", "翠綠": "#50C878", "鮮黃": "#FFFF00",
-            "桃紅": "#C71585", "螢光橘": "#FF4500", "紫羅蘭": "#EE82EE", "電光藍": "#00FFFF"
+        const data = {
+            common: ["#FF0000", "#0000FF", "#008000", "#FFFF00", "#800080", "#FFA500", "#FFC0CB", "#A52A2A"],
+            pastels: ["#ADD8E6", "#90EE90", "#FFB6C1", "#E6E6FA", "#F5F5DC", "#98FF98"],
+            bright: ["#FF0000", "#4169E1", "#50C878", "#FFFF00", "#C71585", "#FF4500"]
         };
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let currentItems = data.common;
+        let rotation = 0;
 
-        function draw() {
-            const mode = document.getElementById('mode-select').value;
-            let items = [];
-
-            if (mode === 'preset-colors') {
-                const colorType = document.getElementById('color-select').value;
-                if (colorType === 'common') items = commonColors;
-                else if (colorType === 'pastels') items = pastels;
-                else if (colorType === 'bright') items = brightColors;
-            } else {
-                const customInput = document.getElementById('custom-items').value;
-                items = customInput.split('\n').map(item => item.trim()).filter(item => item !== '');
-            }
-
-            if (items.length === 0) {
-                document.getElementById('result').textContent = "請輸入或選擇項目！";
-                document.getElementById('color-box').style.display = 'none';
-                return;
-            }
-
-            const randomIndex = Math.floor(Math.random() * items.length);
-            const choice = items[randomIndex];
-            document.getElementById('result').textContent = "恭喜抽到：" + choice;
-
-            const colorBox = document.getElementById('color-box');
-            if (colorMap[choice]) {
-                colorBox.style.display = 'block';
-                colorBox.style.backgroundColor = colorMap[choice];
-            } else {
-                colorBox.style.display = 'none';
-            }
+        function drawWheel() {
+            const slice = 2 * Math.PI / currentItems.length;
+            ctx.clearRect(0, 0, 300, 300);
+            currentItems.forEach((color, i) => {
+                ctx.beginPath();
+                ctx.moveTo(150, 150);
+                ctx.arc(150, 150, 140, i * slice + rotation, (i + 1) * slice + rotation);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.stroke();
+            });
         }
 
-        // Initialize display
-        toggleInputMode();
+        function updateItems() {
+            currentItems = data[document.getElementById('mode-select').value];
+            drawWheel();
+        }
+
+        function spin() {
+            const spinAngle = Math.random() * 2 * Math.PI + 10 * Math.PI;
+            rotation += spinAngle;
+            drawWheel();
+            document.getElementById('result').textContent = "抽到顏色！";
+        }
+        drawWheel();
     </script>
 </body>
 </html>
