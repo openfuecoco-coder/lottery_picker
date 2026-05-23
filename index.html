@@ -91,6 +91,7 @@
 
         <button onclick="draw()">抽籤！</button>
 
+        <div id="color-box" style="width: 100px; height: 100px; margin: 20px auto; border: 2px solid #4A4036; display: none;"></div>
         <div id="result"></div>
     </div>
 
@@ -105,31 +106,48 @@
             document.getElementById('custom-section').style.display = mode === 'custom' ? 'block' : 'none';
         }
 
+        const colorMap = {
+            "紅色": "#FF0000", "藍色": "#0000FF", "綠色": "#008000", "黃色": "#FFFF00",
+            "紫色": "#800080", "橘色": "#FFA500", "粉紅色": "#FFC0CB", "棕色": "#A52A2A",
+            "黑色": "#000000", "白色": "#FFFFFF", "灰色": "#808080", "青色": "#00FFFF",
+            "洋紅色": "#FF00FF", "金色": "#FFD700", "銀色": "#C0C0C0",
+            "淺藍": "#ADD8E6", "淺綠": "#90EE90", "淺粉": "#FFB6C1", "淡紫": "#E6E6FA",
+            "米色": "#F5F5DC", "薄荷綠": "#98FF98", "薰衣草紫": "#E6E6FA", "珊瑚紅": "#F08080", "奶油黃": "#FFFDD0",
+            "亮紅": "#FF0000", "寶藍": "#4169E1", "翠綠": "#50C878", "鮮黃": "#FFFF00",
+            "桃紅": "#C71585", "螢光橘": "#FF4500", "紫羅蘭": "#EE82EE", "電光藍": "#00FFFF"
+        };
+
         function draw() {
             const mode = document.getElementById('mode-select').value;
             let items = [];
 
             if (mode === 'preset-colors') {
                 const colorType = document.getElementById('color-select').value;
-                if (colorType === 'common') {
-                    items = commonColors;
-                } else if (colorType === 'pastels') {
-                    items = pastels;
-                } else if (colorType === 'bright') {
-                    items = brightColors;
-                }
-            } else { // custom mode
+                if (colorType === 'common') items = commonColors;
+                else if (colorType === 'pastels') items = pastels;
+                else if (colorType === 'bright') items = brightColors;
+            } else {
                 const customInput = document.getElementById('custom-items').value;
                 items = customInput.split('\n').map(item => item.trim()).filter(item => item !== '');
             }
 
             if (items.length === 0) {
                 document.getElementById('result').textContent = "請輸入或選擇項目！";
+                document.getElementById('color-box').style.display = 'none';
                 return;
             }
 
             const randomIndex = Math.floor(Math.random() * items.length);
-            document.getElementById('result').textContent = "恭喜抽到：" + items[randomIndex];
+            const choice = items[randomIndex];
+            document.getElementById('result').textContent = "恭喜抽到：" + choice;
+
+            const colorBox = document.getElementById('color-box');
+            if (colorMap[choice]) {
+                colorBox.style.display = 'block';
+                colorBox.style.backgroundColor = colorMap[choice];
+            } else {
+                colorBox.style.display = 'none';
+            }
         }
 
         // Initialize display
