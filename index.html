@@ -1,4 +1,4 @@
-<!-- Version: v1.0.9 -->
+<!-- Version: v1.0.8 -->
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -7,40 +7,55 @@
     <title>顏色轉盤抽籤器</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 10px; background-color: #FDFBF7; color: #4A4036; }
-        .container { background-color: #E8E4D9; padding: 25px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); text-align: center; max-width: 600px; width: 100%; }
+        .container { background-color: #E8E4D9; padding: 25px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 100%; }
         h1 { font-size: 1.5em; margin-bottom: 20px; }
-        .btn-primary { width: 100%; padding: 18px; font-size: 18px; font-weight: bold; background-color: #C4B5A5; color: white; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 15px; }
+        .mode-selection { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; text-align: left; }
+        textarea { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #C4B5A5; border-radius: 8px; font-sizing: 16px; box-sizing: border-box; }
+        .btn-primary { width: 100%; padding: 18px; font-size: 20px; font-weight: bold; background-color: #C4B5A5; color: white; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
         .btn-primary:hover { background-color: #A59685; }
-        input { padding: 12px; border: 1px solid #C4B5A5; border-radius: 8px; font-size: 16px; width: 100%; box-sizing: border-box; }
-        #wheelCanvas { background: #FDFBF7; border: 5px solid #C4B5A5; border-radius: 50%; margin: 20px auto; width: 320px; height: 320px; }
+        .seed-controls { margin: 15px 0; display: flex; gap: 10px; }
+        .seed-controls input { flex-grow: 1; padding: 12px; border: 1px solid #C4B5A5; border-radius: 8px; font-size: 16px; }
+        #wheelCanvas { background: #FDFBF7; border: 5px solid #C4B5A5; border-radius: 50%; margin: 20px auto; display: block; width: 320px; height: 320px; }
         #result { margin-top: 15px; padding: 15px; background: #FDFBF7; border-radius: 10px; }
+        @media (max-width: 480px) { #wheelCanvas { width: 280px; height: 280px; } }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>顏色轉盤抽籤器</h1>
-        <div id="controls">
-            <label>顏色數量 (2-20):</label>
+        <div class="mode-selection">
+            <input type="radio" id="modeColors" name="mode" value="colors" checked onchange="switchMode()"> <label style="display:inline;" for="modeColors">顏色選取</label>
+            <input type="radio" id="modeCustom" name="mode" value="custom" onchange="switchMode()"> <label style="display:inline;" for="modeCustom">自訂內容</label>
+        </div>
+        <div id="colors-mode-controls">
+            <label for="colorCount">數量 (2-20):</label>
             <input type="number" id="colorCount" value="5" min="2" max="20">
             <button class="btn-primary" onclick="generateAndSetNewSeed()">產生顏色 (新 Seed)</button>
         </div>
-        <div class="seed-controls" style="margin-bottom: 20px;">
+        <div id="custom-mode-controls" style="display:none;">
+            <textarea id="customItems" rows="5" placeholder="輸入項目 (每行一個)"></textarea>
+            <button class="btn-primary" onclick="setCustomItemsAndDraw()">設定項目</button>
+        </div>
+        <div class="seed-controls">
             <input type="text" id="seedInput" placeholder="輸入 Seed">
-            <button onclick="setSeedAndRegenerate()">套用 Seed</button>
+            <button onclick="setSeedAndRegenerate()">套用</button>
         </div>
         <canvas id="wheelCanvas" width="560" height="560"></canvas>
         <button class="btn-primary" style="background-color: #4A4036;" onclick="spinWheel()">開始抽籤</button>
         <div id="result">
-            <p>抽中顏色: <span id="pickedItem" style="font-weight:bold;"></span></p>
-            <p id="colorCode" style="display:none;">色號: <span id="pickedColorCode"></span></p>
-            <div id="pickedColorBlock" style="width: 60px; height: 60px; border-radius: 50%; border:2px solid #4A4036; display:none; margin: 0 auto;"></div>
+            <p>抽中: <span id="pickedItem" style="font-weight:bold;"></span></p>
+            <p id="colorInfo" style="display:none;">色號: <span id="pickedColorCode"></span></p>
+            <div id="pickedColorBlock" style="width: 50px; height: 50px; border-radius: 50%; border:2px solid #4A4036; display:none; margin: 0 auto;"></div>
         </div>
-        <div style="margin-top: 15px; font-size: 0.7em;">版本: v1.0.9</div>
+        <div style="margin-top: 15px; font-size: 0.7em;">版本: v1.0.8</div>
     </div>
     <script>
         const canvas = document.getElementById('wheelCanvas'), ctx = canvas.getContext('2d');
+        const colorCountInput = document.getElementById('colorCount'), customItemsTextarea = document.getElementById('customItems');
         let wheelItems = [], currentRotation = 0, isSpinning = false, currentSeed = localStorage.getItem('lotter…seed') || Math.floor(Math.random() * 1000000000);
-        
+        const SIMILARITY_HUE_THRESHOLD = 25;
+
         function seededRandom(seed) {
             let state = Number(seed) || 0;
             return function() { state = (1664525 * state + 1013904223) % 4294967296; return state / 4294967296; };
@@ -48,7 +63,7 @@
         function updateSeedInputAndState(seed) { currentSeed = seed; document.getElementById('seedInput').value = seed; localStorage.setItem('lotter…seed', seed); }
         function generateAndSetNewSeed() { updateSeedInputAndState(Math.floor(Math.random() * 1000000000) + Date.now()); regenerateColors(); }
         function setSeedAndRegenerate() { updateSeedInputAndState(document.getElementById('seedInput').value.trim() || Math.floor(Math.random() * 1000000000)); regenerateColors(); }
-        function regenerateColors() { if(!isSpinning) generateColorsAndDraw(currentSeed); }
+        function regenerateColors() { if(isSpinning) return; document.getElementById('modeColors').checked ? generateColorsAndDraw(currentSeed) : setCustomItemsAndDraw(currentSeed); }
 
         function hslToHex(h, s, l) {
             l /= 100; const a = s * Math.min(l, 1 - l) / 100;
@@ -67,15 +82,19 @@
         }
         function isColorSimilar(newHex, existing) {
             const newHsl = hexToHsl(newHex);
-            return existing.some(ex => Math.abs(newHsl.h - hexToHsl(ex).h) % 180 < 25);
+            return existing.some(ex => {
+                if (ex === '#000000' || ex === '#FFFFFF') return false;
+                let diff = Math.abs(newHsl.h - hexToHsl(ex).h);
+                return (diff > 180 ? 360 - diff : diff) < SIMILARITY_HUE_THRESHOLD;
+            });
         }
 
         function generateColors(count, seed) {
             const colors = [], used = new Set(), rng = seededRandom(seed);
             const common = ['#000000', '#FFFFFF', '#FF0000', '#008000', '#0000FF', '#FFFF00', '#808080', '#FFA500', '#800080', '#00FFFF'];
-            // Shuffle common
-            for (let i = common.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [common[i], common[j]] = [common[j], common[i]]; }
-            for (let c of common) { if (colors.length < count) { colors.push(c); used.add(c); } }
+            let pool = [...common];
+            for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+            for (let c of pool) { if (colors.length < count) { colors.push(c); used.add(c); } }
             while (colors.length < count) {
                 let col; let att = 0;
                 do { col = hslToHex(rng()*360, 70, 60); att++; }
@@ -93,50 +112,82 @@
             wheelItems.forEach((item, i) => {
                 ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius, i * angle, (i + 1) * angle);
                 ctx.closePath(); ctx.fillStyle = item.color; ctx.fill(); ctx.stroke();
+                ctx.save(); ctx.rotate(i * angle + angle / 2);
+                ctx.textAlign = 'right'; ctx.fillStyle = '#FFF'; ctx.font = 'bold 18px sans-serif';
+                ctx.fillText(item.text, radius - 20, 7); ctx.restore();
             });
             ctx.restore();
             ctx.beginPath(); ctx.arc(centerX, centerY, 40, 0, 2*Math.PI); ctx.fillStyle = '#E8E4D9'; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(centerX-15, 0); ctx.lineTo(centerX+15, 0); ctx.lineTo(centerX, 30); ctx.closePath(); ctx.fillStyle = '#4A4036'; ctx.fill();
         }
 
         function spinWheel() {
-            if(isSpinning || wheelItems.length === 0) return;
+            if (isSpinning || wheelItems.length === 0) return;
             isSpinning = true;
-            const target = Math.floor(Math.random() * wheelItems.length);
+            const targetIdx = Math.floor(Math.random() * wheelItems.length);
             const angle = 2 * Math.PI / wheelItems.length;
-            const total = currentRotation + (1.5 * Math.PI - (target * angle + angle/2)) + (8 * 2 * Math.PI);
+            const total = currentRotation + (1.5 * Math.PI - (targetIdx * angle + angle/2)) + (8 * 2 * Math.PI);
             const start = performance.now();
             function animate(now) {
                 const p = Math.min((now - start) / 2500, 1);
                 currentRotation = total * (1 - Math.pow(1 - p, 3));
                 drawWheel();
-                if(p < 1) animationId = requestAnimationFrame(animate);
+                if (p < 1) requestAnimationFrame(animate);
                 else {
                     isSpinning = false;
-                    document.getElementById('pickedItem').textContent = wheelItems[target].color;
-                    document.getElementById('pickedColorCode').textContent = wheelItems[target].color;
-                    document.getElementById('colorCode').style.display = 'block';
+                    document.getElementById('pickedItem').textContent = wheelItems[targetIdx].text;
+                    document.getElementById('pickedColorCode').textContent = wheelItems[targetIdx].color;
+                    document.getElementById('colorInfo').style.display = 'block';
                     const block = document.getElementById('pickedColorBlock');
-                    block.style.backgroundColor = wheelItems[target].color;
+                    block.style.backgroundColor = wheelItems[targetIdx].color;
                     block.style.display = 'inline-block';
                 }
             }
-            animationId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
+        }
+
+        function switchMode() {
+            const isColors = document.getElementById('modeColors').checked;
+            document.getElementById('colors-mode-controls').style.display = isColors ? 'block' : 'none';
+            document.getElementById('custom-mode-controls').style.display = isColors ? 'none' : 'block';
+            if (isColors) {
+                if (!currentSeed) generateAndSetNewSeed();
+                else generateColorsAndDraw(currentSeed);
+            } else {
+                setCustomItemsAndDraw(currentSeed);
+            }
         }
 
         function generateColorsAndDraw(seed) {
             const count = parseInt(document.getElementById('colorCount').value, 10);
             const colors = generateColors(count, seed);
-            wheelItems = colors.map((c) => ({ color: c }));
-            currentRotation = 0; drawWheel();
+            wheelItems = colors.map((c) => ({ text: `顏色 ${colors.indexOf(c)+1}`, color: c }));
+            currentRotation = 0; drawWheel(); clearResult();
+        }
+
+        function setCustomItemsAndDraw(seed) {
+            const items = customItemsTextarea.value.split('\n').filter(i => i.trim());
+            const colors = generateColors(items.length, seed);
+            wheelItems = items.map((t, i) => ({ text: t, color: colors[i] }));
+            currentRotation = 0; drawWheel(); clearResult();
+        }
+
+        function resetTool() {
+            updateSeedInputAndState(generateTrulyRandomSeed());
+            switchMode();
+        }
+
+        function clearResult() {
             document.getElementById('pickedItem').textContent = '';
             document.getElementById('pickedColorCode').textContent = '';
-            document.getElementById('colorCode').style.display = 'none';
+            document.getElementById('colorInfo').style.display = 'none';
             document.getElementById('pickedColorBlock').style.display = 'none';
         }
 
         window.onload = () => {
-            document.getElementById('seedInput').value = currentSeed;
-            generateColorsAndDraw(currentSeed);
+            const s = localStorage.getItem('lotter…seed');
+            updateSeedInputAndState(s ? (isNaN(parseFloat(s)) ? s : parseFloat(s)) : Math.floor(Math.random() * 1000000000));
+            switchMode();
         };
     </script>
 </body>
