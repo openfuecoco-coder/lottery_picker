@@ -205,14 +205,60 @@
             return `#${f(0)}${f(8)}${f(4)}`;
         }
 
-        // Generate an array of unique, distinct colors
-        function generateUniqueColors(count) {
-            const colors = [];
-            for (let i = 0; i < count; i++) {
-                const hue = (360 / count) * i;
-                colors.push(hslToHex(hue, 70, 60)); // Consistent vibrancy
+        // Define common colors (expanded to 10)
+        const commonColors = [
+            '#000000', // Black
+            '#FFFFFF', // White
+            '#FF0000', // Red
+            '#008000', // Green
+            '#0000FF', // Blue
+            '#FFFF00', // Yellow
+            '#808080', // Grey
+            '#FFA500', // Orange
+            '#800080', // Purple
+            '#00FFFF'  // Cyan
+        ];
+        const NUM_COMMON_COLORS = commonColors.length; // This will be 10
+
+        // Generate an array of colors, ensuring common colors are included first
+        function generateColors(count) {
+            const finalGeneratedColors = [];
+            const commonColorsPool = [...commonColors]; // Copy to allow modification
+            const usedColors = new Set();
+
+            // Determine how many colors to pick from commonColors
+            const numToPickFromCommon = Math.min(count, NUM_COMMON_COLORS);
+
+            // Pick unique common colors
+            for (let i = 0; i < numToPickFromCommon; i++) {
+                if (commonColorsPool.length === 0) break; 
+                const randomIndex = Math.floor(Math.random() * commonColorsPool.length);
+                const color = commonColorsPool[randomIndex];
+                finalGeneratedColors.push(color);
+                usedColors.add(color);
+                commonColorsPool.splice(randomIndex, 1); // Remove the picked color from the pool
             }
-            return colors;
+
+            // If more colors are needed, generate random unique colors
+            const numToGenerateRandomly = count - finalGeneratedColors.length;
+            for (let i = 0; i < numToGenerateRandomly; i++) {
+                const hue = Math.random() * 360;
+                let randomColor = hslToHex(hue, 70, 60);
+                
+                // Ensure uniqueness against already picked colors (both common and random)
+                let attempts = 0;
+                while (usedColors.has(randomColor) && attempts < 100) { // Limit attempts to avoid infinite loops
+                    const hue = Math.random() * 360;
+                    randomColor = hslToHex(hue, 70, 60);
+                    attempts++;
+                }
+                // Only add if unique or if we've tried many times (fallback)
+                if (!usedColors.has(randomColor) || attempts >= 100) {
+                    finalGeneratedColors.push(randomColor);
+                    usedColors.add(randomColor);
+                }
+            }
+            return finalGeneratedColors;
         }
 
         // Get contrasting text color for readability
@@ -323,47 +369,49 @@
             const targetSliceIndex = Math.floor(Math.random() * wheelItems.length);
             const sliceAngle = (2 * Math.PI / wheelItems.length);
 
-            // The pointer is at 12 o'clock (1.5 * Math.PI in canvas coordinate system).
-            // We want the center of the target slice to align with this position.
-            // Center of slice k is (k + 0.5) * sliceAngle.
-            // We want (targetSliceIndex + 0.5) * sliceAngle + currentRotation = 1.5 * Math.PI (mod 2PI).
-            // Thus, currentRotation = 1.5 * Math.PI - (targetSliceIndex + 0.5) * sliceAngle.
-            const desiredFinalWheelRotation = (1.5 * Math.PI - (targetSliceIndex + 0.5) * sliceAngle + 4 * Math.PI) % (2 * Math.PI);
+            // Calculate target end rotation
+            // We want the chosen index to align with the pointer (top = 1.5 * PI = 270 deg)
+            // Current wheel position = currentRotation
+            // Target angle (relative to wheel) = targetSliceIndex * sliceAngle + sliceAngle / 2
+            // Total rotation = currentRotation + (full_rotations) + (target_offset - current_offset)
+            
+            const startAngle = currentRotation % (2 * Math.PI);
+            const targetAngle = (targetSliceIndex * sliceAngle + sliceAngle / 2);
+            // Calculate necessary rotation to align
+            let rotationDelta = (1.5 * Math.PI - targetAngle) - startAngle;
+            // Normalize delta
+            while (rotationDelta < 0) rotationDelta += 2 * Math.PI;
+            
+            const totalRotation = currentRotation + (numRotations * 2 * Math.PI) + rotationDelta;
 
-            const startRotationForAnimation = currentRotation; // Use the current wheel rotation as start
-            // Calculate the total rotation needed from current to desired, adding full spins
-            let diff = desiredFinalWheelRotation - (startRotationForAnimation % (2 * Math.PI));
-            if (diff < 0) diff += 2 * Math.PI;
-
-            const endRotationForAnimation = startRotationForAnimation + (numRotations * 2 * Math.PI) + diff;
-
-            const duration = 4000; // 4 seconds spin
+            const duration = 3000; // ms
             const startTime = performance.now();
 
             function animate(currentTime) {
-                const elapsedTime = currentTime - startTime;
-                let progress = Math.min(elapsedTime / duration, 1);
-                progress = 1 - Math.pow(1 - progress, 3); // Slows down at the end
-
-                currentRotation = startRotationForAnimation + (endRotationForAnimation - startRotationForAnimation) * progress;
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Ease-out cubic
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                currentRotation = totalRotation * easeProgress;
                 drawWheel();
 
-                if (elapsedTime < duration) {
+                if (progress < 1) {
                     animationId = requestAnimationFrame(animate);
                 } else {
                     isSpinning = false;
                     spinButton.disabled = false;
                     resetButton.disabled = false;
-
-                    // Ensure final rotation is exactly the desired finalWheelRotation
-                    currentRotation = desiredFinalWheelRotation;
-                    drawWheel();
-
-                    // Robust index determination based on the 12 o'clock pointer (1.5 * Math.PI)
-                    const thetaAtPointer = (1.5 * Math.PI - (currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-                    const calculatedIndex = Math.floor(thetaAtPointer / sliceAngle) % wheelItems.length;
-
-                    displayResult(calculatedIndex);
+                    
+                    // Pointer is at 1.5 PI. Need to find which slice that is.
+                    // Normalize rotation
+                    let finalRotation = currentRotation % (2 * Math.PI);
+                    // Canvas is rotated by finalRotation, items are at i * sliceAngle
+                    // Pointer (1.5PI) is at (i * sliceAngle + sliceAngle/2 + finalRotation)
+                    
+                    // We can just use the targetSliceIndex we calculated!
+                    displayResult(targetSliceIndex);
                 }
             }
             animationId = requestAnimationFrame(animate);
@@ -403,7 +451,7 @@
                 colorCountInput.value = Math.max(2, Math.min(20, count || 5)); // Clamp value
                 return;
             }
-            const colors = generateUniqueColors(count);
+            const colors = generateColors(count);
             wheelItems = colors.map((color, i) => ({
                 text: `顏色 ${i + 1}`, 
                 color: color,
@@ -424,7 +472,7 @@
                 clearResult();
                 return;
             }
-            const colors = generateUniqueColors(items.length); // Generate colors for custom items
+            const colors = generateColors(items.length); // Generate colors for custom items
             wheelItems = items.map((text, i) => ({
                 text: text,
                 color: colors[i],
