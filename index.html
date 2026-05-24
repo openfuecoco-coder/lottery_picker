@@ -1,10 +1,10 @@
-<!-- Version: v1.0.7 -->
+<!-- Version: v1.0.8 -->
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動物轉盤抽籤器</title>
+    <title>顏色轉盤抽籤器</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -34,59 +34,70 @@
 </head>
 <body>
     <div class="container">
-        <h1>動物轉盤抽籤器</h1>
+        <h1>顏色轉盤抽籤器</h1>
+
         <div class="mode-selection">
-            <input type="radio" id="modeColors" name="mode" value="colors" checked onchange="switchMode()"> <label style="display:inline;" for="modeColors">隨機動物名稱</label>
-            <input type="radio" id="modeCustom" name="mode" value="custom" onchange="switchMode()"> <label style="display:inline;" for="modeCustom">自由設定</label>
+            <input type="radio" id="modeColors" name="mode" value="colors" checked onchange="switchMode()"> <label style="display:inline;" for="modeColors">顏色選取</label>
+            <input type="radio" id="modeCustom" name="mode" value="custom" onchange="switchMode()"> <label style="display:inline;" for="modeCustom">自訂內容</label>
         </div>
+
         <div id="colors-mode-controls">
-            <button class="btn-primary" onclick="generateAndSetNewSeed()">產生 20 種動物顏色</button>
+            <label for="colorCount">數量 (2-20):</label>
+            <input type="number" id="colorCount" value="5" min="2" max="20">
+            <button class="btn-primary" onclick="generateAndSetNewSeed()">產生顏色 (新 Seed)</button>
         </div>
+
         <div id="custom-mode-controls" style="display:none;">
             <textarea id="customItems" rows="5" placeholder="輸入項目 (每行一個)"></textarea>
             <button class="btn-primary" onclick="setCustomItemsAndDraw()">設定項目</button>
         </div>
+
         <div class="seed-controls">
             <input type="text" id="seedInput" placeholder="輸入 Seed">
             <button onclick="setSeedAndRegenerate()">套用</button>
         </div>
+
         <canvas id="wheelCanvas" width="560" height="560"></canvas>
         <button class="btn-primary" style="background-color: #4A4036;" onclick="spinWheel()">開始抽籤</button>
+        <button onclick="resetTool()" style="width:100%; padding: 10px;">重設</button>
+
         <div id="result">
             <p>抽中: <span id="pickedItem" style="font-weight:bold;"></span></p>
             <div id="pickedColorBlock" style="width: 50px; height: 50px; border-radius: 50%; border:1px solid #4A4036; display:none; margin: 0 auto;"></div>
         </div>
-        <div style="margin-top: 15px; font-size: 0.7em; color: #8A7B6D;">版本: v1.0.7</div>
+        <div style="margin-top: 15px; font-size: 0.7em; color: #8A7B6D;">版本: v1.0.8</div>
     </div>
     <script>
-        const canvas = document.getElementById('wheelCanvas');
-        const ctx = canvas.getContext('2d');
-        const animals = ["獅子", "老虎", "熊", "兔子", "狐狸", "大象", "長頸鹿", "斑馬", "猴子", "企鵝", "海豚", "貓", "狗", "鳥", "蛇", "狼", "松鼠", "鹿", "貓頭鷹", "鯊魚"];
-        let wheelItems = [];
-        let currentRotation = 0, isSpinning = false;
-        let currentSeed = localStorage.getItem('lotter…seed') || Math.floor(Math.random() * 1000000000);
+        const canvas = document.getElementById('wheelCanvas'), ctx = canvas.getContext('2d');
+        const colorCountInput = document.getElementById('colorCount'), customItemsTextarea = document.getElementById('customItems');
+        let wheelItems = [], currentRotation = 0, isSpinning = false, animationId = null, currentSeed = localStorage.getItem('lotter…seed') || Math.floor(Math.random() * 1000000000);
 
         function seededRandom(seed) {
             let state = Number(seed) || 0;
             return function() { state = (1664525 * state + 1013904223) % 4294967296; return state / 4294967296; };
         }
 
+        function updateSeedInputAndState(seed) { currentSeed = seed; document.getElementById('seedInput').value = seed; localStorage.setItem('lotter…seed', seed); }
+
         function generateAndSetNewSeed() {
-            currentSeed = Math.floor(Math.random() * 1000000000) + Date.now();
-            document.getElementById('seedInput').value = currentSeed;
-            localStorage.setItem('lotter…seed', currentSeed);
+            updateSeedInputAndState(Math.floor(Math.random() * 1000000000) + Date.now());
             regenerateColors();
         }
 
         function setSeedAndRegenerate() {
-            currentSeed = document.getElementById('seedInput').value.trim() || Math.floor(Math.random() * 1000000000);
-            localStorage.setItem('lotter…seed', currentSeed);
+            updateSeedInputAndState(document.getElementById('seedInput').value.trim() || Math.floor(Math.random() * 1000000000));
             regenerateColors();
         }
 
         function regenerateColors() {
             if (isSpinning) return;
-            document.getElementById('modeColors').checked ? generateAnimalsAndDraw() : setCustomItemsAndDraw();
+            document.getElementById('modeColors').checked ? generateColorsAndDraw(currentSeed) : setCustomItemsAndDraw(currentSeed);
+        }
+
+        function hslToHex(h, s, l) {
+            l /= 100; const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => { const k = (n + h / 30) % 12; const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * color).toString(16).padStart(2, '0'); };
+            return `#${f(0)}${f(8)}${f(4)}`;
         }
 
         function hexToHsl(hex) {
@@ -116,7 +127,7 @@
             for(let c of common) { if(colors.length < count) { colors.push(c); used.add(c); } }
             while(colors.length < count) {
                 let col; let att = 0;
-                do { col = '#' + Math.floor(rng()*16777215).toString(16).padStart(6, '0'); att++; }
+                do { col = hslToHex(rng()*360, 70, 60); att++; }
                 while((used.has(col) || isColorSimilar(col, Array.from(used))) && att < 500);
                 colors.push(col); used.add(col);
             }
@@ -131,13 +142,10 @@
             wheelItems.forEach((item, i) => {
                 ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, radius, i * sliceAngle, (i + 1) * sliceAngle);
                 ctx.closePath(); ctx.fillStyle = item.color; ctx.fill(); ctx.stroke();
-                ctx.save(); ctx.rotate(i * sliceAngle + sliceAngle / 2);
-                ctx.textAlign = 'right'; ctx.fillStyle = '#FFF'; ctx.font = 'bold 20px sans-serif';
-                ctx.fillText(item.text, radius - 20, 10); ctx.restore();
             });
             ctx.restore();
             ctx.beginPath(); ctx.arc(centerX, centerY, 40, 0, 2*Math.PI); ctx.fillStyle = '#E8E4D9'; ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(centerX-15, 0); ctx.lineTo(centerX+15, 0); ctx.lineTo(centerX, 30); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(centerX-15, 0); ctx.lineTo(centerX+15, 0); ctx.lineTo(centerX, 30); ctx.closePath(); ctx.fillStyle = '#4A4036'; ctx.fill();
         }
 
         function spinWheel() {
@@ -145,35 +153,44 @@
             isSpinning = true;
             const target = Math.floor(Math.random() * wheelItems.length);
             const angle = 2 * Math.PI / wheelItems.length;
-            const total = currentRotation + (1.5 * Math.PI - (target * angle + angle/2)) + (10 * 2 * Math.PI);
+            const total = currentRotation + (1.5 * Math.PI - (target * angle + angle/2)) + (5 * 2 * Math.PI);
             const start = performance.now();
             function animate(now) {
                 const p = Math.min((now - start) / 2500, 1);
                 currentRotation = total * (1 - Math.pow(1 - p, 3));
                 drawWheel();
                 if(p < 1) animationId = requestAnimationFrame(animate);
-                else { isSpinning = false; document.getElementById('pickedItem').textContent = wheelItems[target].text; }
+                else {
+                    isSpinning = false;
+                    document.getElementById('pickedItem').textContent = wheelItems[target].text;
+                    const block = document.getElementById('pickedColorBlock');
+                    block.style.backgroundColor = wheelItems[target].color;
+                    block.style.display = 'inline-block';
+                }
             }
             animationId = requestAnimationFrame(animate);
         }
 
-        function generateAnimalsAndDraw() {
-            const colors = generateColors(20, currentSeed);
-            wheelItems = animals.map((a, i) => ({ text: a, color: colors[i] }));
+        function switchMode() {
+            const isColors = document.getElementById('modeColors').checked;
+            document.getElementById('colors-mode-controls').style.display = isColors ? 'block' : 'none';
+            document.getElementById('custom-mode-controls').style.display = isColors ? 'none' : 'block';
+            if (isColors && !currentSeed) generateAndSetNewSeed();
+            else regenerateColors();
+        }
+
+        function generateColorsAndDraw(seed) {
+            const count = parseInt(colorCountInput.value, 10);
+            const colors = generateColors(count, seed);
+            wheelItems = colors.map((c, i) => ({ text: `Color ${i + 1}`, color: c }));
             currentRotation = 0; drawWheel();
         }
 
         function setCustomItemsAndDraw() {
-            const items = document.getElementById('customItems').value.split('\n').filter(i => i.trim());
+            const items = customItemsTextarea.value.split('\n').filter(i => i.trim());
             const colors = generateColors(items.length, currentSeed);
             wheelItems = items.map((t, i) => ({ text: t, color: colors[i] }));
             currentRotation = 0; drawWheel();
-        }
-
-        function switchMode() {
-            document.getElementById('colors-mode-controls').style.display = document.getElementById('modeColors').checked ? 'block' : 'none';
-            document.getElementById('custom-mode-controls').style.display = document.getElementById('modeCustom').checked ? 'block' : 'none';
-            regenerateColors();
         }
 
         function resetTool() {
