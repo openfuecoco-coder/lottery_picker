@@ -1,4 +1,4 @@
-<!-- Version: v1.0.3 -->
+<!-- Version: v1.0.4 -->
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -129,16 +129,64 @@
 
         /* Responsive adjustments */
         @media (max-width: 600px) {
+            body {
+                padding: 10px; /* Reduced body padding for mobile */
+            }
             .container {
-                padding: 20px;
+                padding: 20px 15px; /* Adjust container padding */
+            }
+            h1 {
+                font-size: 1.8em; /* Slightly smaller heading */
+            }
+            .mode-selection label {
+                margin-right: 10px;
+            }
+            input[type="number"],
+            textarea {
+                font-size: 15px;
+                padding: 8px;
             }
             button {
                 width: calc(100% - 10px);
                 margin: 5px 0;
+                font-size: 16px; /* Smaller button font */
+                padding: 10px 15px;
             }
+            .seed-controls button { /* Specific adjustment for seed buttons */
+                margin: 5px;
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            #seedInput {
+                max-width: none; /* Allow seed input to grow fully on mobile */
+                width: calc(100% - 10px); /* Fill space with some margin */
+                margin-bottom: 10px;
+            }
+            .seed-controls {
+                flex-direction: column; /* Stack seed controls vertically */
+                align-items: stretch;
+            }
+            .seed-controls label {
+                text-align: center;
+                margin-right: 0;
+                margin-bottom: 5px;
+            }
+
             #wheelCanvas {
                 width: 280px;
                 height: 280px;
+            }
+            #result {
+                padding: 15px;
+            }
+            #pickedItem {
+                font-size: 1.1em;
+            }
+            #pickedColorCode {
+                font-size: 0.8em;
+            }
+            .version-display {
+                font-size: 0.7em;
             }
         }
     </style>
@@ -184,6 +232,10 @@
             <p>抽中項目: <span id="pickedItem"></span></p>
             <p>顏色HEX: <span id="pickedColorCode"></span></p>
             <div id="pickedColorBlock" style="width: 60px; height: 60px; border: 1px solid #4A4036; display: inline-block; vertical-align: middle;"></div>
+        </div>
+
+        <div class="version-display" style="margin-top: 20px; font-size: 0.8em; color: #8A7B6D;">
+            版本: v1.0.4
         </div>
     </div>
 
@@ -314,7 +366,13 @@
         // Check if a color is too similar to any color in a list
         function isColorSimilar(newHex, existingHexList, hueThreshold = SIMILARITY_HUE_THRESHOLD) { 
             const newHsl = hexToHsl(newHex);
+            // Treat black and white as unique and not similar to other hues
+            if (newHex === '#000000' || newHex === '#FFFFFF') return false; 
+
             for (const existingHex of existingHexList) {
+                // Also treat black and white in existing list as unique
+                if (existingHex === '#000000' || existingHex === '#FFFFFF') continue;
+
                 const existingHsl = hexToHsl(existingHex);
                 // Calculate absolute hue difference, considering the circular nature of hue (0-360)
                 let hueDiff = Math.abs(newHsl.h - existingHsl.h);
@@ -351,12 +409,11 @@
             const usedColors = new Set();
             const rng = seededRandom(seed === null ? generateTrulyRandomSeed() : seed); // Use provided seed or generate one
 
-            // Determine how many colors to pick from commonColors
-            const numToPickFromCommon = Math.min(count, NUM_COMMON_COLORS);
-
             // Pick unique common colors
-            for (let i = 0; i < numToPickFromCommon; i++) {
-                if (commonColorsPool.length === 0) break; 
+            for (let i = 0; i < NUM_COMMON_COLORS; i++) { // Always add all common colors if count allows
+                if (finalGeneratedColors.length >= count) break; // Stop if we have enough colors
+                if (commonColorsPool.length === 0) break; // Should not happen if count <= NUM_COMMON_COLORS
+
                 const randomIndex = Math.floor(rng() * commonColorsPool.length);
                 const color = commonColorsPool[randomIndex];
                 finalGeneratedColors.push(color);
@@ -364,23 +421,22 @@
                 commonColorsPool.splice(randomIndex, 1); // Remove the picked color from the pool
             }
 
-            // If more colors are needed, generate random unique colors
+            // If more colors are needed, generate random unique and dissimilar colors
             const numToGenerateRandomly = count - finalGeneratedColors.length;
             for (let i = 0; i < numToGenerateRandomly; i++) {
                 let randomColor;
                 let attempts = 0; // Add attempts counter to prevent infinite loops in extreme cases
                 do { // Use do-while to ensure at least one generation
                     const hue = rng() * 360;
-                    randomColor = hslToHex(hue, 70, 60);
+                    randomColor = hslToHex(hue, 70, 60); // Keep saturation and lightness consistent for now
                     attempts++;
-                } while ((usedColors.has(randomColor) || isColorSimilar(randomColor, Array.from(usedColors))) && attempts < 500); // Limit attempts to avoid infinite loops
+                } while ((usedColors.has(randomColor) || isColorSimilar(randomColor, Array.from(usedColors))) && attempts < 500); // Limit attempts
 
                 if (!usedColors.has(randomColor) && !isColorSimilar(randomColor, Array.from(usedColors))) {
                      finalGeneratedColors.push(randomColor);
                      usedColors.add(randomColor);
                 } else if (attempts >= 500) {
-                    // Fallback: if after many attempts we can't find a unique and dissimilar color, just add a random unique one.
-                    // This can happen if the requested 'count' is too high for the given similarity threshold.
+                    // Fallback: if after many attempts we can't find a unique and dissimilar color, just add a unique one.
                     let fallbackColor;
                     do {
                         const hue = rng() * 360;
@@ -498,9 +554,8 @@
             clearResult();
 
             const numRotations = 5; // Minimum full rotations
-            const seedForTarget = currentSeed !== null ? currentSeed : getSeedFromInput();
-            const rngForTarget = seededRandom(seedForTarget === null ? generateTrulyRandomSeed() : seedForTarget);
-            const targetSliceIndex = Math.floor(rngForTarget() * wheelItems.length);
+            // FIX: Use Math.random() for genuinely random spin outcomes, not seeded RNG
+            const targetSliceIndex = Math.floor(Math.random() * wheelItems.length); 
 
             const sliceAngle = (2 * Math.PI / wheelItems.length);
             
