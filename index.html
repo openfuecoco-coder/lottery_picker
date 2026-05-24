@@ -242,21 +242,14 @@
             // If more colors are needed, generate random unique colors
             const numToGenerateRandomly = count - finalGeneratedColors.length;
             for (let i = 0; i < numToGenerateRandomly; i++) {
-                const hue = Math.random() * 360;
-                let randomColor = hslToHex(hue, 70, 60);
-                
-                // Ensure uniqueness against already picked colors (both common and random)
-                let attempts = 0;
-                while (usedColors.has(randomColor) && attempts < 100) { // Limit attempts to avoid infinite loops
+                let randomColor;
+                do { // Use do-while to ensure at least one generation
                     const hue = Math.random() * 360;
                     randomColor = hslToHex(hue, 70, 60);
-                    attempts++;
-                }
-                // Only add if unique or if we've tried many times (fallback)
-                if (!usedColors.has(randomColor) || attempts >= 100) {
-                    finalGeneratedColors.push(randomColor);
-                    usedColors.add(randomColor);
-                }
+                } while (usedColors.has(randomColor)); // Keep generating until a unique color is found
+
+                finalGeneratedColors.push(randomColor);
+                usedColors.add(randomColor);
             }
             return finalGeneratedColors;
         }
