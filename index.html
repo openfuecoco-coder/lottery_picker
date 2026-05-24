@@ -1,4 +1,4 @@
-<!-- Version: v1.0.1 -->
+<!-- Version: v1.0.2 -->
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -162,8 +162,17 @@
 
         <div id="custom-mode-controls" style="display:none;">
             <label for="customItems">輸入項目 (每行一個):</label>
-            <textarea id="customItems" rows="5" placeholder="吃火鍋\n吃壽司\n吃牛排"></textarea>
+            <textarea id="customItems" rows="5" placeholder="吃火鍋
+吃壽司
+吃牛排"></textarea>
             <button onclick="setCustomItemsAndDraw()">設定項目</button>
+        </div>
+
+        <div class="seed-controls" style="margin-top: 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <label for="seedInput" style="margin-right: 10px; font-weight: bold;">Seed:</label>
+            <input type="text" id="seedInput" placeholder="輸入 Seed 或留空自動產生" style="padding: 8px; border: 1px solid #C4B5A5; border-radius: 5px; font-size: 14px; margin-right: 10px; flex-grow: 1; max-width: 200px;">
+            <button onclick="setSeedAndRegenerate()" style="background-color: #C4B5A5; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px; font-size: 14px;">套用 Seed</button>
+            <button onclick="generateAndSetNewSeed()" style="background-color: #C4B5A5; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">產生新 Seed</button>
         </div>
 
         <canvas id="wheelCanvas" width="400" height="400"></canvas>
@@ -194,6 +203,72 @@
         let isSpinning = false;
         let animationId = null;
 
+        let currentSeed = null;
+        const SEED_STORAGE_KEY = 'lotteryPickerSeed';
+
+        // Simple Linear Congruential Generator (LCG) for seeded randomness
+        function seededRandom(seed) {
+            let a = 1664525;
+            let c = 1013904223;
+            let m = Math.pow(2, 32);
+            let state = Number(seed) % m; // Ensure seed is a number and within bounds
+            if (isNaN(state)) state = 0; // Fallback for non-numeric seeds
+
+            return function() {
+                state = (a * state + c) % m;
+                return state / m; // Return a float between 0 and 1
+            };
+        }
+
+        // Generates a more unpredictable seed for initial load or 'New Seed' button
+        function generateTrulyRandomSeed() {
+            // Use a combination of Math.random, Date.now, and bitwise operations for a better seed
+            return Math.floor(Math.random() * 1000000000) + Date.now() + (Math.random() * 1000 | 0);
+        }
+
+        function getSeedFromInput() {
+            const seedInputValue = document.getElementById('seedInput').value.trim();
+            if (seedInputValue) {
+                // Try to parse as a number, otherwise use as string seed (which seededRandom will handle)
+                const parsedSeed = parseFloat(seedInputValue);
+                return isNaN(parsedSeed) ? seedInputValue : parsedSeed;
+            }
+            return null; // No seed provided
+        }
+
+        function updateSeedInputAndState(seed) {
+            currentSeed = seed;
+            document.getElementById('seedInput').value = seed === null ? '' : seed;
+            try {
+                localStorage.setItem(SEED_STORAGE_KEY, seed === null ? '' : seed);
+            } catch (e) {
+                console.error("Failed to save seed to localStorage:", e);
+            }
+        }
+
+        function generateAndSetNewSeed() {
+            const newSeed = generateTrulyRandomSeed();
+            updateSeedInputAndState(newSeed);
+            regenerateColors();
+        }
+
+        function setSeedAndRegenerate() {
+            const newSeed = getSeedFromInput();
+            updateSeedInputAndState(newSeed);
+            regenerateColors();
+        }
+
+        function regenerateColors() {
+            if (isSpinning) return; // Don't regenerate while spinning
+            const seedToUse = currentSeed !== null ? currentSeed : getSeedFromInput();
+            if (document.getElementById('modeColors').checked) {
+                generateColorsAndDraw(seedToUse);
+            } else {
+                setCustomItemsAndDraw(seedToUse);
+            }
+            clearResult();
+        }
+
         // HSL to HEX converter
         function hslToHex(h, s, l) {
             l /= 100;
@@ -221,19 +296,20 @@
         ];
         const NUM_COMMON_COLORS = commonColors.length; // This will be 10
 
-        // Generate an array of colors, ensuring common colors are included first
-        function generateColors(count) {
+        // Generate an array of colors, ensuring common colors are included first, using a seed
+        function generateColors(count, seed) {
             const finalGeneratedColors = [];
-            const commonColorsPool = [...commonColors]; // Copy to allow modification
+            const commonColorsPool = [...commonColors];
             const usedColors = new Set();
+            const rng = seededRandom(seed === null ? generateTrulyRandomSeed() : seed); // Use provided seed or generate one
 
             // Determine how many colors to pick from commonColors
             const numToPickFromCommon = Math.min(count, NUM_COMMON_COLORS);
 
             // Pick unique common colors
             for (let i = 0; i < numToPickFromCommon; i++) {
-                if (commonColorsPool.length === 0) break; 
-                const randomIndex = Math.floor(Math.random() * commonColorsPool.length);
+                if (commonColorsPool.length === 0) break;
+                const randomIndex = Math.floor(rng() * commonColorsPool.length);
                 const color = commonColorsPool[randomIndex];
                 finalGeneratedColors.push(color);
                 usedColors.add(color);
@@ -245,7 +321,7 @@
             for (let i = 0; i < numToGenerateRandomly; i++) {
                 let randomColor;
                 do { // Use do-while to ensure at least one generation
-                    const hue = Math.random() * 360;
+                    const hue = rng() * 360;
                     randomColor = hslToHex(hue, 70, 60);
                 } while (usedColors.has(randomColor)); // Keep generating until a unique color is found
 
@@ -360,9 +436,12 @@
             clearResult();
 
             const numRotations = 5; // Minimum full rotations
-            const targetSliceIndex = Math.floor(Math.random() * wheelItems.length);
-            const sliceAngle = (2 * Math.PI / wheelItems.length);
+            const seedForTarget = currentSeed !== null ? currentSeed : getSeedFromInput();
+            const rngForTarget = seededRandom(seedForTarget === null ? generateTrulyRandomSeed() : seedForTarget);
+            const targetSliceIndex = Math.floor(rngForTarget() * wheelItems.length);
 
+            const sliceAngle = (2 * Math.PI / wheelItems.length);
+            
             // Calculate target end rotation
             // We want the chosen index to align with the pointer (top = 1.5 * PI = 270 deg)
             // Current wheel position = currentRotation
@@ -370,13 +449,35 @@
             // Total rotation = currentRotation + (full_rotations) + (target_offset - current_offset)
             
             const startAngle = currentRotation % (2 * Math.PI);
-            const targetAngle = (targetSliceIndex * sliceAngle + sliceAngle / 2);
-            // Calculate necessary rotation to align
-            let rotationDelta = (1.5 * Math.PI - targetAngle) - startAngle;
-            // Normalize delta
-            while (rotationDelta < 0) rotationDelta += 2 * Math.PI;
+            const targetSliceCenterAngle = (targetSliceIndex * sliceAngle + sliceAngle / 2);
             
-            const totalRotation = currentRotation + (numRotations * 2 * Math.PI) + rotationDelta;
+            // Calculate the angle needed to bring the target slice center to the top (1.5 * PI)
+            // The pointer is at 1.5*PI. The slice center is at targetSliceCenterAngle.
+            // We need to rotate the wheel such that targetSliceCenterAngle + rotation_offset = 1.5*PI
+            // rotation_offset = 1.5*PI - targetSliceCenterAngle
+            // However, currentRotation is applied to the wheel. We want the wheel to end up at a position
+            // where the target slice is under the pointer.
+            // Let's re-think this: current rotation is applied to the whole wheel.
+            // Items are drawn relative to the wheel's current orientation.
+            // The pointer is fixed at the top (Y=0, X=centerX).
+            // If an item is at angle `item_angle` (from its start), its center is at `item_angle + sliceAngle/2` from the original 0 line.
+            // When the wheel is rotated by `currentRotation`, the item's orientation becomes `item_angle + sliceAngle/2 + currentRotation`.
+            // We want this final orientation to be 1.5 * PI (top).
+            // `(targetSliceIndex * sliceAngle + sliceAngle/2) + currentRotation_at_end = 1.5 * PI + N * 2*PI`
+            // This is complex. A simpler approach: calculate the number of steps to rotate.
+            // Let's assume the target slice needs to end up centered under the pointer.
+            // The pointer is at the top of the canvas.
+            // The center of the item `targetSliceIndex` is at `targetSliceIndex * sliceAngle + sliceAngle / 2` radians from the wheel's 0-degree line.
+            // We want this angle + the final wheel rotation to equal 1.5 * PI (or 270 degrees).
+            // `(targetSliceIndex * sliceAngle + sliceAngle / 2) + final_wheel_rotation_offset = 1.5 * PI`
+            // `final_wheel_rotation_offset = 1.5 * PI - (targetSliceIndex * sliceAngle + sliceAngle / 2)`
+            // We need to add full spins, so `final_wheel_rotation_offset += numRotations * 2 * PI`
+            
+            let finalRotationOffset = (1.5 * Math.PI) - (targetSliceIndex * sliceAngle + sliceAngle / 2);
+            // Normalize to be positive
+            while (finalRotationOffset < 0) finalRotationOffset += 2 * Math.PI;
+            
+            const totalRotation = currentRotation + finalRotationOffset + (numRotations * 2 * Math.PI);
 
             const duration = 3000; // ms
             const startTime = performance.now();
@@ -398,13 +499,11 @@
                     spinButton.disabled = false;
                     resetButton.disabled = false;
                     
-                    // Pointer is at 1.5 PI. Need to find which slice that is.
-                    // Normalize rotation
-                    let finalRotation = currentRotation % (2 * Math.PI);
-                    // Canvas is rotated by finalRotation, items are at i * sliceAngle
-                    // Pointer (1.5PI) is at (i * sliceAngle + sliceAngle/2 + finalRotation)
-                    
-                    // We can just use the targetSliceIndex we calculated!
+                    // Ensure final rotation is exact and items align correctly
+                    currentRotation = totalRotation; 
+                    drawWheel(); // Redraw with exact final rotation
+
+                    // Display the result based on the target slice index
                     displayResult(targetSliceIndex);
                 }
             }
@@ -429,23 +528,23 @@
             if (modeColors.checked) {
                 colorsModeControls.style.display = 'block';
                 customModeControls.style.display = 'none';
-                generateColorsAndDraw(); // Initialize with colors
+                generateColorsAndDraw(currentSeed); // Initialize with colors using current seed
             } else {
                 colorsModeControls.style.display = 'none';
                 customModeControls.style.display = 'block';
-                setCustomItemsAndDraw(); // Initialize with custom items (if any)
+                setCustomItemsAndDraw(currentSeed); // Initialize with custom items using current seed
             }
         }
 
         // Generate colors and redraw for color quantity mode
-        function generateColorsAndDraw() {
+        function generateColorsAndDraw(seed) { // Added seed parameter
             const count = parseInt(colorCountInput.value, 10);
             if (isNaN(count) || count < 2 || count > 20) {
                 alert('請輸入 2 到 20 之間的顏色數量！');
                 colorCountInput.value = Math.max(2, Math.min(20, count || 5)); // Clamp value
                 return;
             }
-            const colors = generateColors(count);
+            const colors = generateColors(count, seed); // Pass seed
             wheelItems = colors.map((color, i) => ({
                 text: `顏色 ${i + 1}`, 
                 color: color,
@@ -457,7 +556,7 @@
         }
 
         // Set custom items and redraw for custom content mode
-        function setCustomItemsAndDraw() {
+        function setCustomItemsAndDraw(seed) { // Added seed parameter
             const items = customItemsTextarea.value.split('\n').map(item => item.trim()).filter(item => item !== '');
             if (items.length === 0) {
                 alert('請輸入至少一個抽籤項目！');
@@ -466,7 +565,8 @@
                 clearResult();
                 return;
             }
-            const colors = generateColors(items.length); // Generate colors for custom items
+            // Generate colors for custom items using the provided seed
+            const colors = generateColors(items.length, seed); // Pass seed
             wheelItems = items.map((text, i) => ({
                 text: text,
                 color: colors[i],
@@ -483,11 +583,18 @@
                 cancelAnimationFrame(animationId);
                 isSpinning = false;
                 spinButton.disabled = false;
+                resetButton.disabled = false;
+            }
+            // Reset seed input to currentSeed state and generate new if null
+            if (currentSeed === null) {
+                updateSeedInputAndState(generateTrulyRandomSeed());
+            } else {
+                document.getElementById('seedInput').value = currentSeed;
             }
             document.getElementById('modeColors').checked = true;
             colorCountInput.value = 5;
             customItemsTextarea.value = '';
-            switchMode(); // This will also call generateColorsAndDraw
+            switchMode(); // This will also call generateColorsAndDraw with currentSeed
             clearResult();
         }
 
@@ -501,7 +608,14 @@
 
         // Initial setup
         window.onload = () => {
-            switchMode(); // Set initial mode (colors) and draw
+            // Try to load seed from localStorage
+            const savedSeed = localStorage.getItem(SEED_STORAGE_KEY);
+            if (savedSeed) {
+                updateSeedInputAndState(savedSeed);
+            } else {
+                updateSeedInputAndState(generateTrulyRandomSeed()); // Generate a new seed if none saved
+            }
+            switchMode(); // Set initial mode (colors) and draw with the current seed
         };
     </script>
 </body>
